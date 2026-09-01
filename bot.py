@@ -2,21 +2,32 @@ import os
 import hmac
 import hashlib
 import logging
-import unicodedata
-import requests
+
 from flask import Flask, request, abort
+import requests
+
+def limpiar(texto):
+    # convierte "CatÁlogo" -> "catalogo" y quita tildes
+    texto = texto.lower()
+    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
+    return texto
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("absurdo_bot")
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
 
+# Evita que un atacante mande payloads gigantes al webhook (DoS básico)
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # 64 KB es más que suficiente para un mensaje de WhatsApp
+
+# NUNCA escribimos secretos aquí, los lee del servidor
 PHONE_ID = os.environ.get("PHONE_ID")
 TOKEN = os.environ.get("WHATSAPP_TOKEN")
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN")
 APP_SECRET = os.environ.get("APP_SECRET")
 
+# Fail-fast: si falta una variable crítica, el bot no debe arrancar
+# "silenciosamente roto". Mejor un error claro al desplegar.
 _REQUIRED_VARS = {
     "PHONE_ID": PHONE_ID,
     "WHATSAPP_TOKEN": TOKEN,
@@ -32,6 +43,12 @@ if _missing:
 
 
 def es_de_meta(payload: bytes, firma_recibida: str) -> bool:
+    """Verifica que el payload realmente venga de Meta.
+
+    IMPORTANTE: si no hay APP_SECRET configurado, se RECHAZA la petición
+    (fail-closed). Antes se aceptaba todo (fail-open), lo cual permitía
+    a cualquiera enviar mensajes falsos si el secreto no estaba seteado.
+    """
     if not firma_recibida:
         return False
     firma_esperada = hmac.new(APP_SECRET.encode(), payload, hashlib.sha256).hexdigest()
@@ -39,6 +56,7 @@ def es_de_meta(payload: bytes, firma_recibida: str) -> bool:
 
 
 def enviar_mensaje(para: str, texto: str) -> None:
+    # Limita el texto a 1000 caracteres para evitar payloads excesivos
     texto = texto[:1000]
     url = f"https://graph.facebook.com/v22.0/{PHONE_ID}/messages"
     headers = {"Authorization": f"Bearer {TOKEN}"}
@@ -51,15 +69,10 @@ def enviar_mensaje(para: str, texto: str) -> None:
         logger.exception("Error de red enviando mensaje a %s", para)
 
 
-def limpiar(texto: str) -> str:
-    texto = texto.lower().strip()
-    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
-    return texto
-
-
 @app.route('/webhook', methods=['GET'])
 def verificar_webhook():
     token_recibido = request.args.get('hub.verify_token', '')
+    # Comparación en tiempo constante en vez de == para evitar timing attacks
     if hmac.compare_digest(token_recibido, VERIFY_TOKEN):
         return request.args.get('hub.challenge', '')
     abort(403)
@@ -81,46 +94,57 @@ def recibir_mensaje():
         if 'messages' in value:
             mensaje = value['messages'][0]
             numero = mensaje['from']
-            texto = mensaje.get('text', {}).get('body', '').lower()[:100]
+            texto = mensaje.get('text', {}).get('body', '').lower()[:100]  # Solo 100 chars
+import unicodedata
 
-            texto_limpio = limpiar(texto)
+def limpiar(texto):
+    # Convierte "CatÁlogo" -> "catalogo" (minúscula y sin tildes)
+    texto = texto.lower().strip()
+    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
+    return texto
 
-            saludos = ["hola", "ola", "holas", "hello", "hi", "buenas", "que hubo", "quiubo", "q hubo", "hey", "holi", "buenos dias", "buenas tardes", "buenas noches", "precio","precios"]
+# --- Lógica principal ---
+texto_limpio = limpiar(texto)
 
-            if any(s in texto_limpio for s in saludos):
-                resp = """¡Ey, parce! 🖤 Bienvenido a Absurdo, soy Absu, tu parcero digital. ¿Qué más? Aquí puedes preguntarme por calidad, tallas, diseños, envíos o el estado de tu pedido. Tenemos camisetas bien chimbas y estampadas a mano. ¿Qué te gustaría saber?🔥
+saludos = ["hola", "ola", "holas", "hello", "hi", "buenas", "que hubo", "quiubo", "q hubo", "hey", "holi", "buenos dias", "buenas tardes", "buenas noches", "precio","precios"]
 
-1 Calidad
+if any(s in texto_limpio for s in saludos):
+    resp = """¡Ey, parce! 🖤 Bienvenido a Absurdo, soy Absu, tu parcero digital. ¿Qué más? Aquí puedes preguntarme por calidad, tallas, diseños, envíos o el estado de tu pedido. Tenemos camisetas bien chimbas y estampadas a mano. ¿Qué te gustaría saber?🔥
+
+1️ Calidad
 2 Tallas 
 3 Catálogo
 4 Envíos
 5 Hablar con Daniel"""
 
-            elif texto_limpio == "1" or any(m in texto_limpio for m in ["material", "calidad", "tela", "gruesa", "delgada"]):
-                resp = "Todo es 100% algodón premium parce, no se encoge, no pica y no se pone motosa. Es gruesita pero fresca, una bacaneria 🖤"
+elif texto_limpio == "1" or any(m in texto_limpio for m in ["material", "calidad", "tela", "gruesa", "delgada"]):
+    resp = "Todo es 100% algodón premium parce, no se encoge, no pica y no se pone motosa. Es gruesita pero fresca, una bacaneria 🖤"
     
-            elif texto_limpio == "2" or any(t in texto_limpio for t in ["talla", "tallas"]):
-                resp = "¡Claro parce! tanto para hombres como mujeres manejamos de la XS a la XL, en regular y oversize 🖤 ¿Cuál usas vos?🔥"
+elif texto_limpio == "2" or any(t in texto_limpio for t in ["talla", "tallas"]):
+    resp = "¡Claro parce! tanto para hombres como mujeres manejamos de la XS a la XL, en regular y oversize 🖤 ¿Cuál usas vos?🔥"
 
-            elif texto_limpio == "3" or any(c in texto_limpio for c in ["catalogo","catalago"]):
-                resp = "¡Claro! Píllate todo lo que tenemos aquí parce 👉 https://wa.me/c/573166572773 🖤"
+elif texto_limpio == "3" or any(c in texto_limpio for c in ["catalogo","catalago"]):
+    resp = "¡Claro! Píllate todo lo que tenemos aquí parce 👉 https://wa.me/c/573166572773 🖤"
 
-            elif texto_limpio == "4" or any(e in texto_limpio for e in ["envio", "envios","llega", "ciudad", "demora", "tarda", "entrega"]):
-                resp = "Hacemos envíos a toda Colombia parce 🖤 A Cali llega en 1-2 días y nacional 3-5 días. ¿Para qué ciudad es?"
+elif texto_limpio == "4" or any(e in texto_limpio for e in ["envio", "envios","llega", "ciudad", "demora", "tarda", "entrega"]):
+    resp = "Hacemos envíos a toda Colombia parce 🖤 A Cali llega en 1-2 días y nacional 3-5 días. ¿Para qué ciudad es?"
     
-            elif texto_limpio == "5" or any(p in texto_limpio for p in ["persona", "humano", "asesor"]):
-                resp = "Listo parce, yo soy ABSU 🤖 ya le aviso a Daniel para que te escriba él mismo, dame 1 min 🖤"
+elif texto_limpio == "5" or any(p in texto_limpio for p in ["persona", "humano", "asesor"]):
+    resp = "Listo parce, yo soy ABSU 🤖 ya le aviso a Daniel para que te escriba él mismo, dame 1 min 🖤"
 
-            else:
-                resp = "No te entendí bro 😅 escribe *hola* para ver el menú"
+else:
+    resp = "No te entendí bro 😅 escribe *hola* para ver el menú"
 
-            enviar_mensaje(numero, resp)
-
+enviar_mensaje(numero, resp)
     except Exception:
+        # No mostramos el error al usuario externo, pero sí lo registramos
+        # internamente para poder detectar payloads maliciosos o bugs.
         logger.exception("Error procesando mensaje entrante")
 
     return "OK", 200
 
 
 if __name__ == "__main__":
+    # debug=False siempre en producción: el modo debug expone un
+    # evaluador de código (Werkzeug debugger) si algo falla.
     app.run(debug=False)
