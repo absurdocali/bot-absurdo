@@ -11,6 +11,20 @@ logger = logging.getLogger("absurdo_bot")
 
 app = Flask(__name__)
 
+@app.route('/')
+def home():
+    return "Bot Absurdo Live", 200
+
+@app.route('/privacy')
+def privacy():
+    return """
+    <h1>Política de Privacidad - ABSURDO VENTAS</h1>
+    <p>Esta app usa la API de WhatsApp Business para atender a clientes de Absurdo.</p>
+    <p>No vendemos datos. Solo usamos los mensajes para responder consultas.</p>
+    <p>Contacto: felmontoya1234@gmail.com</p>
+    <p>Para borrar tus datos escríbenos a ese correo.</p>
+    """, 200, {'Content-Type': 'text/html'}
+
 # Evita que un atacante mande payloads gigantes al webhook (DoS básico)
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # 64 KB es más que suficiente para un mensaje de WhatsApp
 
