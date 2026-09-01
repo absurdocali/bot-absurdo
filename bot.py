@@ -5,12 +5,7 @@ import logging
 
 from flask import Flask, request, abort
 import requests
-
-def limpiar(texto):
-    # convierte "CatÁlogo" -> "catalogo" y quita tildes
-    texto = texto.lower()
-    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
-    return texto
+import unicodedata
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("absurdo_bot")
@@ -95,7 +90,7 @@ def recibir_mensaje():
             mensaje = value['messages'][0]
             numero = mensaje['from']
             texto = mensaje.get('text', {}).get('body', '').lower()[:100]  # Solo 100 chars
-import unicodedata
+
 
 def limpiar(texto):
     # Convierte "CatÁlogo" -> "catalogo" (minúscula y sin tildes)
