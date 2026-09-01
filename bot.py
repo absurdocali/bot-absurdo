@@ -100,7 +100,8 @@ def recibir_mensaje():
      #   logger.warning("Firma inválida en /webhook, petición rechazada")
       #  abort(403)
 
-    data = request.get_json(silent=True)
+        data = request.get_json(silent=True)
+    logger.info("Webhook recibido: %s", data)
     if not data:
         return "OK", 200
 
