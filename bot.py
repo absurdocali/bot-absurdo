@@ -18,11 +18,11 @@ def home():
 @app.route('/privacy')
 def privacy():
     return """
-    <h1>Política de Privacidad - ABSURDO VENTAS</h1>
+    <h1>Politica de Privacidad - ABSURDO VENTAS</h1>
     <p>Esta app usa la API de WhatsApp Business para atender a clientes de Absurdo.</p>
     <p>No vendemos datos. Solo usamos los mensajes para responder consultas.</p>
     <p>Contacto: felmontoya1234@gmail.com</p>
-    <p>Para borrar tus datos escríbenos a ese correo.</p>
+    <p>Para borrar tus datos escribenos a ese correo.</p>
     """, 200, {'Content-Type': 'text/html'}
 
 # Evita que un atacante mande payloads gigantes al webhook (DoS básico)
