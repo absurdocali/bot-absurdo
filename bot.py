@@ -5,13 +5,6 @@ import logging
 
 from flask import Flask, request, abort
 import requests
-mport unicodedata
-
-def limpiar(texto):
-    # convierte "CatÁlogo" -> "catalogo" y quita tildes
-    texto = texto.lower()
-    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
-    return texto
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("absurdo_bot")
