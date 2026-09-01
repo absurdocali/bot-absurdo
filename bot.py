@@ -15,10 +15,10 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # 64 KB es más que suficiente para un mensaje de WhatsApp
 
 # NUNCA escribimos secretos aquí, los lee del servidor
-PHONE_ID = os.environ.get("PHONE_ID")
-TOKEN = os.environ.get("WHATSAPP_TOKEN")
-VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN")
-APP_SECRET = os.environ.get("APP_SECRET")
+VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN","").strip()
+PHONE_ID = os.environ.get("PHONE_ID","").strip()
+TOKEN = os.environ.get("WHATSAPP_TOKEN","").strip()
+APP_SECRET = os.environ.get("APP_SECRET","").strip()
 
 # Fail-fast: si falta una variable crítica, el bot no debe arrancar
 # "silenciosamente roto". Mejor un error claro al desplegar.
